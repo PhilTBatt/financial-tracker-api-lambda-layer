@@ -1,13 +1,20 @@
 FROM public.ecr.aws/lambda/python:3.13
 
-# Copy requirements.txt
+# Copy requirements.txt and install dependencies
 COPY requirements.txt ${LAMBDA_TASK_ROOT}
-
-# Install the specified packages
 RUN pip install -r requirements.txt
 
-# Copy function code
+# Copy your function code
 COPY lambda_function.py ${LAMBDA_TASK_ROOT}
 
-# Set the CMD to your handler (could also be done as a parameter override outside of the Dockerfile)
-CMD [ "lambda_function.handler" ]
+# Copy the RIE binary and entrypoint script into the container
+ADD aws-lambda-rie /usr/local/bin/aws-lambda-rie
+COPY entry_script.sh /entry_script.sh
+
+# Make the entry script executable
+RUN chmod +x /entry_script.sh
+
+ENV _HANDLER=lambda_function.lambda_handler
+
+# Use the script as the container entrypoint
+ENTRYPOINT [ "/entry_script.sh" ]
