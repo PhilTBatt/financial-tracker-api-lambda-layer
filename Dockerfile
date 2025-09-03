@@ -7,14 +7,5 @@ RUN pip install -r requirements.txt
 # Copy your function code
 COPY lambda_function.py ${LAMBDA_TASK_ROOT}
 
-# Copy the RIE binary and entrypoint script into the container
-ADD aws-lambda-rie /usr/local/bin/aws-lambda-rie
-COPY entry_script.sh /entry_script.sh
-
-# Make the entry script executable
-RUN chmod +x /entry_script.sh
-
-ENV _HANDLER=lambda_function.lambda_handler
-
-# Use the script as the container entrypoint
-ENTRYPOINT [ "/entry_script.sh" ]
+# Set the Lambda handler: tells AWS Lambda which file and function to invoke
+CMD ["lambda_function.lambda_handler"]

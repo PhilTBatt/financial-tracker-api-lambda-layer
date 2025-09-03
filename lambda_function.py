@@ -9,40 +9,45 @@ from decimal import Decimal
 from qifparse.parser import QifParser
 
 def lambda_handler(event, context):
-    record = event['Records'][0]
-    bucket_name = record['s3']['bucket']['name']
-    object_key = record['s3']['object']['key']
+    try:
+        record = event['Records'][0]
+        bucket_name = record['s3']['bucket']['name']
+        object_key = record['s3']['object']['key']
 
-    print(f"File uploaded: {object_key} in bucket: {bucket_name}")
+        print(f"File uploaded: {object_key} in bucket: {bucket_name}")
 
-    s3 = boto3.client('s3')
-    response = s3.get_object(Bucket=bucket_name, Key=object_key)
-    file_contents = response['Body'].read().decode('utf-8')
-    qif = QifParser.parse(io.StringIO(file_contents)) 
+        s3 = boto3.client('s3')
+        response = s3.get_object(Bucket=bucket_name, Key=object_key)
+        file_contents = response['Body'].read().decode('utf-8')
+        qif = QifParser.parse(io.StringIO(file_contents)) 
 
-    data = []
-    for tx in qif.get_transactions():
-        data.append({
-            'date': tx.date.strftime('%Y-%m-%d'),
-            'amount': tx.amount,
-            'memo': tx.memo,    
-            'payee': tx.payee
-        })
+        data = []
+        for tx in qif.get_transactions():
+            data.append({
+                'date': tx.date.strftime('%Y-%m-%d'),
+                'amount': tx.amount,
+                'memo': tx.memo,    
+                'payee': tx.payee
+            })
 
-    df = pd.DataFrame(data)
+        df = pd.DataFrame(data)
 
-    if df.empty:
-        print("No transactions found in QIF file.")
-        return
+        if df.empty:
+            print("No transactions found in QIF file.")
+            return
 
-    image_key = f'output/images/{uuid.uuid4()}.png'
-    image_url = plot_image(s3, bucket_name, image_key, df)
+        image_key = f'output/images/{uuid.uuid4()}.png'
+        image_url = plot_image(s3, bucket_name, image_key, df)
 
-    save_full_batch(boto3.resource('dynamodb').Table('financial-app-db'), df, image_url)
+        save_full_batch(boto3.resource('dynamodb').Table('financial-app-db'), df, image_url)
 
-    print(f"Saved parsed transactions from '{object_key}' to DynamoDB.")
+        print(f"Saved parsed transactions from '{object_key}' to DynamoDB.")
 
-def plot_image(s3, bucket, s3_key, data):
+    except Exception as e:
+        print(e)
+
+
+def plot_image(s3, bucket, image_key, data):
     fig, ax = plt.subplots()
     ax.plot([1, 2, 3], [100, 200, 300])
     plt.title("Transaction Chart")
@@ -51,8 +56,8 @@ def plot_image(s3, bucket, s3_key, data):
     plt.savefig(buffer, format='png')
     buffer.seek(0)
 
-    s3.put_object(Bucket=bucket, Key=s3_key, Body=buffer, ContentType='image/png')
-    url = f'https://{bucket}.s3.amazonaws.com/{s3_key}'
+    s3.put_object(Bucket=bucket, Key=image_key, Body=buffer, ContentType='image/png')
+    url = f'https://{bucket}.s3.amazonaws.com/{image_key}'
     return url
 
 
