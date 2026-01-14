@@ -7,5 +7,5 @@ RUN pip install -r requirements.txt
 # Copy your function code
 COPY lambda_function.py ${LAMBDA_TASK_ROOT}
 
-# Set the Lambda handler: tells AWS Lambda which file and function to invoke
+# Set the Lambda handler
 CMD ["lambda_function.lambda_handler"]

@@ -1,10 +1,13 @@
+import os
+
+os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
+
 import boto3
 import io
 import pandas as pd
 import matplotlib.pyplot as plt
 import uuid
 from datetime import datetime
-
 from decimal import Decimal
 from qifparse.parser import QifParser
 
@@ -19,10 +22,10 @@ def lambda_handler(event, context):
         s3 = boto3.client('s3')
         response = s3.get_object(Bucket=bucket_name, Key=object_key)
         file_contents = response['Body'].read().decode('utf-8')
-        qif = QifParser.parse(io.StringIO(file_contents)) 
+        qif = QifParser.parse(io.StringIO(file_contents))
 
         data = []
-        for tx in qif.get_transactions():
+        for tx in qif.get_transactions()[0]:
             data.append({
                 'date': tx.date.strftime('%Y-%m-%d'),
                 'amount': tx.amount,
@@ -76,4 +79,5 @@ def save_full_batch(table, df, image_url=None):
     if image_url:
         item['image_url'] = image_url
 
-    table.put_item(Item=item)
+    response = table.put_item(Item=item)
+    print("DynamoDB put_item response:", response)
