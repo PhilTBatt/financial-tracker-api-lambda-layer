@@ -16,3 +16,16 @@ Resources:
     Metadata:
       Dockerfile: Dockerfile
       DockerContext: ./
+  FinancialAppDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: financial-app-db
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
