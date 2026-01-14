@@ -5,13 +5,15 @@ import boto3
 import pandas as pd
 import matplotlib.pyplot as plt
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from qifparse.parser import QifParser
 
 os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
 
 s3 = boto3.client('s3')
+dynamodb = boto3.client('dynamodb')
+table = dynamodb.Table('YourTableName')
 
 logger = logging.getLogger()
 logger.setLevel("INFO")
@@ -50,3 +52,20 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.error(f"Error processing order: {str(e)}")
         raise
+
+    save_full_batch(table, df)
+
+def save_full_batch(table, df, image_url=None):
+    transactions = df.to_dict(orient='records')
+
+    for tx in transactions:
+        tx['amount'] = Decimal(str(tx['amount']))
+
+    item = {
+        'id': str(uuid.uuid4()),
+        'transactions': transactions,
+        'created_at': datetime.now(timezone.utc).isoformat()
+    }
+
+    response = table.put_item(Item=item)
+    logger.info("DynamoDB put_item response: {response}")
