@@ -40,3 +40,13 @@ def lambda_handler(event, context):
             })
 
         df = pd.DataFrame(data)
+
+        if df.empty:
+            logger.error("No transactions found in QIF file.")
+            return
+        
+        logger.info(f"File parsed successfully with {len(df)} transactions.")
+
+    except Exception as e:
+        logger.error(f"Error processing order: {str(e)}")
+        raise
