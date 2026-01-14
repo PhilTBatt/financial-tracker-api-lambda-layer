@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: finiancial-tracker-api-lambda-function
+Resources:
+  lambda_handler:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      Runtime: python3.13
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      Description: A lambda function that processes financial data
+      Policies:
+        - AWSLambdaBasicExecutionRole
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ./
