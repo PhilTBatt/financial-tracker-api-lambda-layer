@@ -1,0 +1,96 @@
+import os
+import io
+import logging
+import boto3
+import pandas as pd
+import matplotlib.pyplot as plt
+import uuid
+from datetime import datetime
+from decimal import Decimal
+from qifparse.parser import QifParser
+
+os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
+
+s3 = boto3.client('s3')
+
+logger = logging.getLogger()
+logger.setLevel("INFO")
+
+def lambda_handler(event, context):
+    try:
+        record = event['Records'][0]
+        bucket_name = record['s3']['bucket']['name']
+        object_key = record['s3']['object']['key']
+
+        logger.info(f"File uploaded: {object_key} in bucket: {bucket_name}")
+
+        response = s3.get_object(Bucket=bucket_name, Key=object_key)
+        file_contents = response['Body'].read().decode('utf-8')
+        qif = QifParser.parse(io.StringIO(file_contents))
+
+        data = []
+        for tx in qif.get_transactions()[0]:
+            date_str = tx.date.strftime('%Y-%m-%d') if tx.date else None
+            
+            data.append({
+                'date': date_str,
+                'amount': tx.amount,
+                'memo': tx.memo,    
+                'payee': tx.payee
+            })
+
+        df = pd.DataFrame(data)
+
+        if df.empty:
+            logger.error("No transactions found in QIF file.")
+            return
+        
+        logger.info(f"File parsed successfully with {len(df)} transactions.")
+
+        image_key = f'output/images/{uuid.uuid4()}.png'
+        image_url = plot_image(s3, bucket_name, image_key, df)
+
+        save_full_batch(boto3.resource('dynamodb').Table('financial-app-db'), df, image_url)
+
+        logger.info(f"Saved parsed transactions from '{object_key}' to DynamoDB.")
+
+        return {
+            "statusCode": 200,
+            "message": "File processed successfully",
+        }
+    
+    except Exception as e:
+        logger.error(f"Error processing order: {str(e)}")
+        raise
+
+
+def save_full_batch(table, df, image_url=None):
+    transactions = df.to_dict(orient='records')
+
+    for tx in transactions:
+        tx['amount'] = Decimal(str(tx['amount']))
+
+    item = {
+        'id': str(uuid.uuid4()),
+        'transactions': transactions,
+        'created_at': datetime.utcnow().isoformat()
+    }
+
+    if image_url:
+        item['image_url'] = image_url
+
+    response = table.put_item(Item=item)
+    print("DynamoDB put_item response:", response)
+
+def plot_image(s3, bucket, image_key, data):
+    fig, ax = plt.subplots()
+    ax.plot([1, 2, 3], [100, 200, 300])
+    plt.title("Transaction Chart")
+
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+
+    s3.put_object(Bucket=bucket, Key=image_key, Body=buffer, ContentType='image/png')
+    url = f'https://{bucket}.s3.amazonaws.com/{image_key}'
+    return url
