@@ -7,12 +7,14 @@ Resources:
     Properties:
       PackageType: Image
       Architectures:
-        - x86_64
+      - x86_64
       MemorySize: 128
       Timeout: 100
       Description: A lambda function that processes financial data
       Policies:
-        - AWSLambdaBasicExecutionRole
+      - AWSLambdaBasicExecutionRole
+      ImageUri: financeapplambdahandler:latest
     Metadata:
+      DockerContext: C:\Users\nicky\Documents\code\financial-tracker\financial-tracker-api-lambda-layer
       Dockerfile: Dockerfile
-      DockerContext: ./
+      SamResourceId: FinanceAppLambdaHandler
