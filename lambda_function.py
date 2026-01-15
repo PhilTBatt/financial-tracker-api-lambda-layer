@@ -19,8 +19,18 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
+    record = event['Records'][0]
+    bucket_name = record['s3']['bucket']['name']
+    object_key = record['s3']['object']['key']
+
+    logger.info(f"File uploaded: {object_key} in bucket: {bucket_name}")
+
+    response = s3.get_object(Bucket=bucket_name, Key=object_key)
+    file_contents = response['Body'].read().decode('utf-8')
+    qifFile = QifParser.parse(io.StringIO(file_contents))
+
     try:
-        df = process_file(event)
+        df = process_file(qifFile)
         if df.empty:
             logger.error("No transactions found in QIF file.")
             return
@@ -36,19 +46,9 @@ def lambda_handler(event, context):
         logger.error(f"Error saving infomation to database: {str(e)}")
         raise
 
-def process_file(event):
-    record = event['Records'][0]
-    bucket_name = record['s3']['bucket']['name']
-    object_key = record['s3']['object']['key']
-
-    logger.info(f"File uploaded: {object_key} in bucket: {bucket_name}")
-
-    response = s3.get_object(Bucket=bucket_name, Key=object_key)
-    file_contents = response['Body'].read().decode('utf-8')
-    qif = QifParser.parse(io.StringIO(file_contents))
-
+def process_file(qifFile):
     data = []
-    for tx in qif.get_transactions()[0]:
+    for tx in qifFile.get_transactions()[0]:
         date_str = tx.date.strftime('%Y-%m-%d') if tx.date else None
 
         data.append({
