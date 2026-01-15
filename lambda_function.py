@@ -12,11 +12,11 @@ from qifparse.parser import QifParser
 os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
 
 s3 = boto3.client('s3')
-dynamodb = boto3.client('dynamodb')
+dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table('YourTableName')
 
 logger = logging.getLogger()
-logger.setLevel("INFO")
+logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     try:
@@ -53,9 +53,9 @@ def lambda_handler(event, context):
         logger.error(f"Error processing order: {str(e)}")
         raise
 
-    save_full_batch(table, df)
+    save_transactions_to_db(table, df)
 
-def save_full_batch(table, df, image_url=None):
+def save_transactions_to_db(table, df, image_url=None):
     transactions = df.to_dict(orient='records')
 
     for tx in transactions:
