@@ -13,6 +13,9 @@ Resources:
       Description: A lambda function that processes financial data
       Policies:
       - AWSLambdaBasicExecutionRole
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: FinancialAppDB
       ImageUri: financeapplambdahandler:latest
     Metadata:
       DockerContext: C:\Users\nicky\Documents\code\financial-tracker\financial-tracker-api-lambda-layer
