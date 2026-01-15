@@ -13,7 +13,7 @@ os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
 
 s3 = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table('YourTableName')
+table = dynamodb.Table('FinancialAppDB')
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -50,13 +50,14 @@ def process_file(event):
     data = []
     for tx in qif.get_transactions()[0]:
         date_str = tx.date.strftime('%Y-%m-%d') if tx.date else None
-        
-    data.append({
-        'date': date_str,
-        'amount': tx.amount,
-        'memo': tx.memo,    
-        'payee': tx.payee
-        })
+
+        data.append({
+            'date': date_str,
+            'amount': tx.amount,
+            'memo': tx.memo,    
+            'payee': tx.payee
+            })
+    
 
     df = pd.DataFrame(data)
 
@@ -75,6 +76,5 @@ def save_transactions_to_db(table, df, image_url=None):
     }
 
     response = table.put_item(Item=item)
-    logger.info("DynamoDB put_item response: {response}")
 
     return response

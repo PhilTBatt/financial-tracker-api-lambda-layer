@@ -13,6 +13,9 @@ Resources:
       Description: A lambda function that processes financial data
       Policies:
         - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: 
+              Ref: FinancialAppDB
     Metadata:
       Dockerfile: Dockerfile
       DockerContext: ./
