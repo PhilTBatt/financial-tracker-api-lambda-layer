@@ -1,0 +1,8 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "financial-app-stack"
+s3_bucket = "financial-app-sam-artifacts"
+region = "eu-north-1"
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = false
