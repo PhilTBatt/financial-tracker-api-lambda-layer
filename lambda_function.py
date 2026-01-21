@@ -4,24 +4,31 @@ import logging
 import boto3
 import pandas as pd
 import matplotlib.pyplot as plt
-import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 from qifparse.parser import QifParser
+from urllib.parse import unquote_plus
 
 os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
 
 s3 = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table('FinancialAppDB')
+table = dynamodb.Table('financial-app-db')
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+
 def lambda_handler(event, context):
     record = event['Records'][0]
     bucket_name = record['s3']['bucket']['name']
-    object_key = record['s3']['object']['key']
+    raw_key = record['s3']['object']['key']
+    object_key = unquote_plus(raw_key)
+    
+
+    key = object_key[len('upload/'):] if object_key.startswith('upload/') else object_key
+    i = key.find("_")
+    db_id = key[:i] if i != -1 else key
 
     logger.info(f"File uploaded: {object_key} in bucket: {bucket_name}")
 
@@ -40,7 +47,7 @@ def lambda_handler(event, context):
         raise
 
     try:
-        save_transactions_to_db(table, df)
+        save_transactions_to_db(table, df, db_id)
         logger.info(f"DF saved to DB.")
     except Exception as e:
         logger.error(f"Error saving infomation to database: {str(e)}")
@@ -63,18 +70,18 @@ def process_file(qifFile):
 
     return df
 
-def save_transactions_to_db(table, df, image_url=None):
+def save_transactions_to_db(table, df, db_id, image_url=None):
     transactions = df.to_dict(orient='records')
 
     for tx in transactions:
         tx['amount'] = Decimal(str(tx['amount']))
 
     item = {
-        'id': str(uuid.uuid4()),
+        'id': db_id,
         'transactions': transactions,
         'created_at': datetime.now(timezone.utc).isoformat()
     }
 
-    response = table.put_item(Item=item)
+    response = table.put_item(Item=item, ConditionExpression="attribute_not_exists(id)")
 
     return response
