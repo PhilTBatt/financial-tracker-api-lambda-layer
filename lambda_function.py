@@ -30,9 +30,9 @@ def lambda_handler(event, context):
     i = key.find("_")
     db_id = key[:i] if i != -1 else key
 
-    logger.info(f"File uploaded: {object_key} in bucket: {bucket_name}")
+    logger.info(f"File uploaded: {raw_key} in bucket: {bucket_name}")
 
-    response = s3.get_object(Bucket=bucket_name, Key=object_key)
+    response = s3.get_object(Bucket=bucket_name, Key=raw_key)
     file_contents = response['Body'].read().decode('utf-8')
     qifFile = QifParser.parse(io.StringIO(file_contents))
 

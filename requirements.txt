@@ -1,4 +1,3 @@
 pandas
 matplotlib
 qifparse
-unquote_plus

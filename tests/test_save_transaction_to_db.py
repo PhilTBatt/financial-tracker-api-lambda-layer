@@ -8,7 +8,7 @@ def test_save_transactions_to_db(setup_db):
         {"date": "2026-01-01", "amount": 12.34, "memo": "test", "payee": "Alice"},
         {"date": "2026-01-02", "amount": 56.78, "memo": "test2", "payee": "Bob"}])
 
-    save_transactions_to_db(setup_db, df)
+    save_transactions_to_db(setup_db, df, '1')
 
     response = setup_db.scan()
     items = response.get("Items", [])
