@@ -2,6 +2,7 @@ import os
 import io
 import logging
 import boto3
+import uuid
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timezone
@@ -25,14 +26,11 @@ def lambda_handler(event, context):
     raw_key = record['s3']['object']['key']
     object_key = unquote_plus(raw_key)
     
+    db_id = db_id = str(uuid.uuid4())
 
-    key = object_key[len('upload/'):] if object_key.startswith('upload/') else object_key
-    i = key.find("_")
-    db_id = key[:i] if i != -1 else key
+    logger.info(f"File uploaded: {object_key} in bucket: {bucket_name}")
 
-    logger.info(f"File uploaded: {raw_key} in bucket: {bucket_name}")
-
-    response = s3.get_object(Bucket=bucket_name, Key=raw_key)
+    response = s3.get_object(Bucket=bucket_name, Key=object_key)
     file_contents = response['Body'].read().decode('utf-8')
     qifFile = QifParser.parse(io.StringIO(file_contents))
 
@@ -48,7 +46,7 @@ def lambda_handler(event, context):
 
     try:
         save_transactions_to_db(table, df, db_id)
-        logger.info(f"DF saved to DB.")
+        logger.info(f"DF saved to DB wiht ID: {db_id}.")
     except Exception as e:
         logger.error(f"Error saving infomation to database: {str(e)}")
         raise

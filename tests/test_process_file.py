@@ -15,5 +15,3 @@ def test_process_file():
 
     assert df.iloc[0]["payee"] == "FASTER PAYMENTS RECEIPT REF.Phil FROM P Battersby, 1200.01"
     assert df.iloc[0]["amount"] == 1200.01
-
-    print(df.head())

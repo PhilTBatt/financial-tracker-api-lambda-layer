@@ -3,7 +3,7 @@
         {
             "s3": {
                 "bucket": { "name": "financial-files-bucket" },
-                "object": { "key": "upload/fb250351-0f39-42b5-a6d8-1a9bb274dba7_Statements09012954183252.qif" }
+                "object": { "key": "Statements09012954183252.qif" }
             }
         }
     ]

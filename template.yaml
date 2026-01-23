@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: finiancial-tracker-api-lambda-function
+
 Resources:
   FinanceAppLambdaHandler:
     Type: AWS::Serverless::Function
@@ -16,9 +17,24 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: 
               Ref: FinancialAppDB
+        - S3ReadPolicy:
+            BucketName: financial-files-bucket
+      Events:
+        S3UploadEvent:
+          Type: S3
+          Properties:
+            Bucket:
+              Ref: UploadBucket
+            Events: s3:ObjectCreated:*
     Metadata:
       Dockerfile: Dockerfile
       DockerContext: ./
+
+  UploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: financial-files-bucket
+
   FinancialAppDB:
     Type: AWS::DynamoDB::Table
     Properties:
