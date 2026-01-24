@@ -13,5 +13,5 @@ def test_process_file():
     assert not df.empty
     assert len(df) == 600
 
-    assert df.iloc[0]["payee"] == "FASTER PAYMENTS RECEIPT REF.Phil FROM P Battersby, 1200.01"
-    assert df.iloc[0]["amount"] == 1200.01
+    assert df.iloc[0]["payee"] == "PEAST LEEDS SNOOKER CLU (VIA GOOGLE PAY), ON 30-07-2025, 4.80"
+    assert df.iloc[0]["amount"] == 4.80
