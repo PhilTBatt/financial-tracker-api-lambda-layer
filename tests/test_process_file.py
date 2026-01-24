@@ -11,7 +11,7 @@ def test_process_file():
     df = process_file(qifParsed)
 
     assert not df.empty
-    assert len(df) == 600
+    assert len(df) == 599
 
-    assert df.iloc[0]["payee"] == "PEAST LEEDS SNOOKER CLU (VIA GOOGLE PAY), ON 30-07-2025, 4.80"
-    assert df.iloc[0]["amount"] == 4.80
+    assert df.iloc[0]["description"] == "EAST LEEDS SNOOKER CLU (VIA GOOGLE PAY), ON 30-07-2025, 4.80"
+    assert df.iloc[0]["amount"] == -4.80

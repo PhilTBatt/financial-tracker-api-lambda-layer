@@ -82,17 +82,17 @@ def save_transactions_to_db(table, df: pd.DataFrame, metrics: dict, db_id: str):
     transactions = df.to_dict(orient='records')
 
     for tx in transactions:
-        tx['amount'] = Decimal(str(tx['amount']))
+        tx['amount'] = int(round(tx['amount'] * 100))
 
     metrics_ddb = {
         "total_transactions": int(metrics["total_transactions"]),
-        "total_spent": Decimal(str(metrics["total_spent"])),
-        "avg_monthly_spend": Decimal(str(metrics["avg_monthly_spend"])),
+        "total_spent": int(round(metrics["total_spent"] * 100)),
+        "avg_monthly_spend": int(round(metrics["avg_monthly_spend"] * 100)),
         "top_category": metrics["top_category"],
-        "top_category_spent": Decimal(str(metrics["top_category_spent"])),
+        "top_category_spent": int(round(metrics["top_category_spent"] * 100)),
         "date_range_label": metrics["date_range_label"],
         "monthly_spend_history": [
-            { "period": p["period"], "amount": Decimal(str(p["amount"])) }    for p in metrics["monthly_spend_history"]
+            { "period": p["period"], "amount": int(round(p["amount"] * 100)) }    for p in metrics["monthly_spend_history"]
         ]
     }
 
