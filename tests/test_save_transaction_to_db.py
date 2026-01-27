@@ -15,7 +15,11 @@ def test_save_transactions_to_db(setup_db):
         "top_category": "Other",
         "top_category_spent": 1.0,
         "date_range_label": "Jan 2026 – Jan 2026",
-        "monthly_spend_history": [{ "period": "2026-01", "amount": 1.0 }]
+        "monthly_spend_history": [{ "period": "2026-01", "amount": 1.0 }],
+        "category_spend_totals": {
+            "Shopping": 1.0,
+            "Other": 2.5
+        }
     }
 
     save_transactions_to_db(setup_db, df, metrics, '1')
@@ -35,3 +39,5 @@ def test_save_transactions_to_db(setup_db):
     assert item["metrics"]["total_transactions"] == 2
     assert item["metrics"]["total_spent"] == 100
     assert item["metrics"]["monthly_spend_history"] == [{ "period": "2026-01", "amount": 100 }]
+
+    assert item["metrics"]["category_spend_totals"] == { "Shopping": 100, "Other": 250  }

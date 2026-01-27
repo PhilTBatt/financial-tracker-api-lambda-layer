@@ -90,10 +90,10 @@ def save_transactions_to_db(table, df: pd.DataFrame, metrics: dict, db_id: str):
         "avg_monthly_spend": int(round(metrics["avg_monthly_spend"] * 100)),
         "top_category": metrics["top_category"],
         "top_category_spent": int(round(metrics["top_category_spent"] * 100)),
-        "date_range_label": metrics["date_range_label"],
+        "category_spend_totals": {
+            k: int(round(v * 100)) for k, v in metrics["category_spend_totals"].items() },
         "monthly_spend_history": [
-            { "period": p["period"], "amount": int(round(p["amount"] * 100)) }    for p in metrics["monthly_spend_history"]
-        ]
+            { "period": p["period"], "amount": int(round(p["amount"] * 100)) } for p in metrics["monthly_spend_history"] ]
     }
 
 
@@ -142,10 +142,13 @@ def calculate_metrics(transactions: pd.DataFrame):
         monthly_spend_history = []
 
     spend_df["category"] = spend_df["description"].apply(categorise)
-    by_cat = spend_df.groupby("category")["spend"].sum()
+    by_cat = spend_df.groupby("category")["spend"].sum().sort_values(ascending=False)
+    category_spend_totals = {k: float(v) for k, v in by_cat.items()}
+    non_other = by_cat.drop(labels=["Other"], errors="ignore")
 
-    top_category = by_cat.idxmax() if len(by_cat) else None
-    top_category_spent = float(by_cat.max()) if len(by_cat) else 0.0
+
+    top_category = non_other.idxmax() if len(non_other) else None
+    top_category_spent = float(non_other.max()) if len(non_other) else 0.0
 
     metrics = {
         "total_transactions": total_transactions,
@@ -154,7 +157,8 @@ def calculate_metrics(transactions: pd.DataFrame):
         "top_category": top_category,
         "top_category_spent": top_category_spent,
         "date_range_label": date_range_label,
-        "monthly_spend_history": monthly_spend_history
+        "monthly_spend_history": monthly_spend_history,
+        "category_spend_totals": category_spend_totals
     }
 
     return metrics

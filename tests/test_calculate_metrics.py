@@ -24,3 +24,9 @@ def test_calculate_metrics():
         {"period": "2025-07", "amount": 24.80},
         {"period": "2025-08", "amount": 10.00}
     ]
+
+    assert m["category_spend_totals"] == {
+        "Shopping": 20.00,
+        "Entertainment": 4.80,
+        "Online shopping": 10.00
+    }
