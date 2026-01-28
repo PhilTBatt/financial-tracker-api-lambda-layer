@@ -17,7 +17,7 @@ def test_calculate_metrics():
     assert m["date_range_label"] == "Jul 2025 – Aug 2025"
     assert m["avg_monthly_spend"] == 17.40
 
-    assert m["top_category"] == "Shopping"
+    assert m["top_category"] == "Groceries"
     assert m["top_category_spent"] == 20.00
 
     assert m["monthly_spend_history"] == [
@@ -26,7 +26,7 @@ def test_calculate_metrics():
     ]
 
     assert m["category_spend_totals"] == {
-        "Shopping": 20.00,
+        "Groceries": 20.00,
         "Entertainment": 4.80,
-        "Online shopping": 10.00
+        "Online Shopping": 10.00
     }

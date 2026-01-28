@@ -90,6 +90,7 @@ def save_transactions_to_db(table, df: pd.DataFrame, metrics: dict, db_id: str):
         "avg_monthly_spend": int(round(metrics["avg_monthly_spend"] * 100)),
         "top_category": metrics["top_category"],
         "top_category_spent": int(round(metrics["top_category_spent"] * 100)),
+        "date_range_label": metrics["date_range_label"],
         "category_spend_totals": {
             k: int(round(v * 100)) for k, v in metrics["category_spend_totals"].items() },
         "monthly_spend_history": [
@@ -172,16 +173,16 @@ def categorise(description: str) -> str:
         return "Cash"
     
     if any(x in d for x in ["BILL PAYMENT", "STANDING ORDER", "DIRECT DEBIT", "TRANSFER"]):
-        return "Bills / Transfers"
+        return "Transfers"
 
     if any(x in d for x in ["TESCO", "ALDI", "LIDL", "ASDA", "SAINSBURY", "MORRISONS", "WOODLAND STORE"]):
-        return "Shopping"
+        return "Groceries"
 
     if any(x in d for x in ["UBER", "TRAINLINE", "BUS", "ARRIVA", "FIRST", "TFL"]):
         return "Transport"
 
     if any(x in d for x in ["AMAZON", "AMZN", "EBAY"]):
-        return "Online shopping"
+        return "Online Shopping"
 
     if any(x in d for x in ["STEAM", "STEAMGAMES", "XBOX", "PLAYSTATION", "PSN", "XSOLLA", "NINTENDO", "GOOGLE PLAY", "GOOGLE YOUTUBE"]):
         return "Gaming"
