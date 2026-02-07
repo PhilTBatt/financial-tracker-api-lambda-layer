@@ -1,36 +1,46 @@
 # Lambda Function For QIF Processing & DynamoDB Integration
 
-#### 1. AWS Setup:
-    Ensure you have AWS credentials configured
+This AWS Lambda function processes QIF transaction files uploaded to S3 and stores the parsed transactions in DynamoDB.  
+It is to be used in conjunction with an Angular front end and a Java Spring Boot API.
 
-#### 2. Make sure your S3 bucket exists and your Lambda has permission to:
-    Read from S3
+Front end repo: https://github.com/PhilTBatt/financial-tracker-app
+API repo: https://github.com/PhilTBatt/financial-tracker-api
 
-    Write to DynamoDB
+## AWS Setup
+Ensure AWS credentials are configured locally or via environment variables.
 
-#### 3. Upload & Processing:
-    Drop QIF file in S3 bucket
+The Lambda requires permissions to:
+- Read objects from the S3 upload bucket
+- Write/read items in the DynamoDB table
+- Write logs to CloudWatch
 
-#### 4. Lambda is triggered:
-    Reads file from S3
+## Upload & Processing Flow
 
-    Parses it into a DataFrame using process_file()
+1. Upload a QIF file to the configured S3 bucket  
+2. The Lambda function is triggered automatically  
+3. The function:
+   - Reads the file from S3
+   - Parses it into a DataFrame using `process_file()`
+   - Saves transactions to DynamoDB via `save_transactions_to_db()`
 
-    Saves transactions to DynamoDB via save_transactions_to_db()
+## Local Testing
 
-#### 5. Local Testing:
-    Pytest: python -m pytest
+Run python tests:
+```bash
+python -m pytest
+```
+Build the Lambda:
+```bash
+sam build
+```
+Invoke the Lambda locally with SAM:
+```bash
+sam local invoke -e events/event.json
+```
+(Requires test file in S3: financial-files-bucket/lambda-event-test-example.qif)
 
-    Run Lambda locally: sam build
-                        sam local invoke -e events/event.json
-                        (Requires test file in S3: financial-files-bucket/lambda-event-test-example.qif)
-
-#### 6. Deploy Lambda:
-    Deploy to aws: sam deploy --resolve-image-repos
-
-#### 7. Usage:
-    Upload QIF file to configured S3 bucket
-
-    Lambda is triggered automatically
-
-    Transactions are saved to DynamoDB (FinancialAppDB)
+## Deploy
+Deploy to aws: 
+```bash
+sam deploy --resolve-image-repos
+```
