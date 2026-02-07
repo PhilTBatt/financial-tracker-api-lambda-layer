@@ -1,4 +1,3 @@
-from decimal import Decimal
 from lambda_function import calculate_metrics
 import pandas as pd
 
@@ -13,20 +12,32 @@ def test_calculate_metrics():
     m = calculate_metrics(df)
 
     assert m["total_transactions"] == 4
-    assert m["total_spent"] == 34.80
     assert m["date_range_label"] == "Jul 2025 – Aug 2025"
-    assert m["avg_monthly_spend"] == 17.40
 
-    assert m["top_category"] == "Groceries"
-    assert m["top_category_spent"] == 20.00
+    assert m["monthly"]["labels"] == ["2025-07", "2025-08"]
+    assert m["monthly"]["in"] == [0.0, 1000.0]
+    assert m["monthly"]["out"] == [24.80, 10.00]
+    assert m["monthly"]["avgOut"] == 17.40
 
-    assert m["monthly_spend_history"] == [
-        {"period": "2025-07", "amount": 24.80},
-        {"period": "2025-08", "amount": 10.00}
-    ]
-
-    assert m["category_spend_totals"] == {
-        "Groceries": 20.00,
-        "Entertainment": 4.80,
-        "Online Shopping": 10.00
+    assert m["monthly"]["byCategoryOut"] == {
+        "Entertainment": [4.80, 0.0],
+        "Groceries": [20.00, 0.0],
+        "Online Shopping": [0.0, 10.00],
     }
+
+    assert m["weekly"]["labels"] == ["2025-W29", "2025-W31", "2025-W32"]
+    assert m["weekly"]["in"] == [0.0, 0.0, 1000.0]
+    assert m["weekly"]["out"] == [20.00, 14.80, 0.0]
+    assert m["weekly"]["avgOut"] == (20.00 + 14.80 + 0.0) / 3
+
+    assert m["weekly"]["byCategoryOut"] == {
+        "Entertainment": [0.0, 4.80, 0.0],
+        "Groceries": [20.00, 0.0, 0.0],
+        "Online Shopping": [0.0, 10.00, 0.0],
+    }
+
+    assert m["buckets"]["outgoingSize"]["labels"] == ["£0–5", "£5–10", "£10–25", "£25–50", "£50–100", "£100–250", "£250–500", "£500+"]
+    assert m["buckets"]["outgoingSize"]["counts"] == [1, 0, 2, 0, 0, 0, 0, 0]
+
+    assert m["buckets"]["incomingSize"]["labels"] == ["£0–5", "£5–10", "£10–25", "£25–50", "£50–100", "£100–250", "£250–500", "£500+"]
+    assert m["buckets"]["incomingSize"]["counts"] == [0, 0, 0, 0, 0, 0, 0, 1]

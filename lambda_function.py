@@ -26,7 +26,7 @@ def lambda_handler(event, context):
     raw_key = record['s3']['object']['key']
     object_key = unquote_plus(raw_key)
     
-    db_id = str(uuid.uuid4())
+    db_id = object_key.split("_", 1)[0]
 
     logger.info(f"File uploaded: {object_key} in bucket: {bucket_name}")
 
@@ -74,27 +74,38 @@ def process_file(qifFile):
             })
     
 
-    df = pd.DataFrame(data)
-
-    return df
+    return pd.DataFrame(data)
 
 def save_transactions_to_db(table, df: pd.DataFrame, metrics: dict, db_id: str):
     transactions = df.to_dict(orient='records')
 
     for tx in transactions:
-        tx['amount'] = int(round(tx['amount'] * 100))
+        tx['amount'] = int(round(tx['amount'] * 100)) if tx['amount'] is not None else 0
+
+    def pennies_array(arr):
+        return [int(round(float(x) * 100)) for x in arr]
+
+    def pennies_map_of_arrays(m):
+        return {k: pennies_array(v) for k, v in m.items()}
 
     metrics_ddb = {
         "total_transactions": int(metrics["total_transactions"]),
-        "total_spent": int(round(metrics["total_spent"] * 100)),
-        "avg_monthly_spend": int(round(metrics["avg_monthly_spend"] * 100)),
-        "top_category": metrics["top_category"],
-        "top_category_spent": int(round(metrics["top_category_spent"] * 100)),
-        "date_range_label": metrics["date_range_label"],
-        "category_spend_totals": {
-            k: int(round(v * 100)) for k, v in metrics["category_spend_totals"].items() },
-        "monthly_spend_history": [
-            { "period": p["period"], "amount": int(round(p["amount"] * 100)) } for p in metrics["monthly_spend_history"] ]
+        "date_range_label": metrics.get("date_range_label"),
+        "monthly": {
+            "labels": metrics["monthly"]["labels"],
+            "in": pennies_array(metrics["monthly"]["in"]),
+            "out": pennies_array(metrics["monthly"]["out"]),
+            "avgOut": int(round(metrics["monthly"]["avgOut"] * 100)),
+            "byCategoryOut": pennies_map_of_arrays(metrics["monthly"]["byCategoryOut"]),
+        },
+        "weekly": {
+            "labels": metrics["weekly"]["labels"],
+            "in": pennies_array(metrics["weekly"]["in"]),
+            "out": pennies_array(metrics["weekly"]["out"]),
+            "avgOut": int(round(metrics["weekly"]["avgOut"] * 100)),
+            "byCategoryOut": pennies_map_of_arrays(metrics["weekly"]["byCategoryOut"]),
+        },
+        "buckets": metrics["buckets"]
     }
 
 
@@ -111,58 +122,139 @@ def save_transactions_to_db(table, df: pd.DataFrame, metrics: dict, db_id: str):
 
 def calculate_metrics(transactions: pd.DataFrame):
     df = transactions.copy()
-
     total_transactions = int(len(df))
 
     df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0.0)
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    spend_df = df[df["amount"] < 0].copy()
-    spend_df["spend"] = -spend_df["amount"]
+    df = df.dropna(subset=["date"])
 
-    total_spent = float(spend_df["spend"].sum())
+    if df.empty:
+        return {
+            "total_transactions": total_transactions,
+            "date_range_label": None,
+            "monthly": {"labels": [], "in": [], "out": [], "avgOut": 0.0, "byCategoryOut": {}},
+            "weekly": {"labels": [], "in": [], "out": [], "avgOut": 0.0, "byCategoryOut": {}},
+            "buckets": {"outgoingSize": {"labels": ["£0–5","£5–10","£10–25","£25–50","£50–100","£100–250","£250+"],
+                                         "counts": [0,0,0,0,0,0,0]}}
+        }
 
-    valid_dates = df["date"].dropna()
-    if len(valid_dates) > 0:
-        start = valid_dates.min()
-        end = valid_dates.max()
-        date_range_label = f"{start.strftime('%b %Y')} – {end.strftime('%b %Y')}"
-        months_in_range = (end.year - start.year) * 12 + (end.month - start.month) + 1
+    start = df["date"].min()
+    end = df["date"].max()
+    date_range_label = f"{start.strftime('%b %Y')} – {end.strftime('%b %Y')}"
 
+    out_df = df[df["amount"] < 0].copy()
+    out_df["out"] = -out_df["amount"]
+    out_df["category"] = out_df["description"].apply(categorise)
+
+    in_df = df[df["amount"] > 0].copy()
+    in_df["in"] = in_df["amount"]
+
+    df["month"] = df["date"].dt.strftime("%Y-%m")
+
+    month_labels = sorted(df["month"].unique().tolist())
+
+    out_by_month = out_df.groupby(out_df["date"].dt.strftime("%Y-%m"))["out"].sum()
+    in_by_month = in_df.groupby(in_df["date"].dt.strftime("%Y-%m"))["in"].sum()
+
+    monthly_out = [float(out_by_month.get(m, 0.0)) for m in month_labels]
+    monthly_in = [float(in_by_month.get(m, 0.0)) for m in month_labels]
+    monthly_avg_out = float(sum(monthly_out) / len(monthly_out)) if month_labels else 0.0
+
+    monthly_by_category_out = {}
+    if not out_df.empty:
+        out_df["month"] = out_df["date"].dt.strftime("%Y-%m")
+        month_cat = out_df.groupby(["month", "category"])["out"].sum()
+        categories = sorted(out_df["category"].dropna().unique().tolist())
+        for cat in categories:
+            monthly_by_category_out[cat] = [float(month_cat.get((m, cat), 0.0)) for m in month_labels]
+
+    iso_all = df["date"].dt.isocalendar()
+    df["iso_label"] = (
+        iso_all["year"].astype(int).astype(str)
+        + "-W"
+        + iso_all["week"].astype(int).astype(str).str.zfill(2)
+    )
+    week_labels = sorted(df["iso_label"].unique().tolist())
+
+    if not out_df.empty:
+        iso_out = out_df["date"].dt.isocalendar()
+        out_df["iso_label"] = (
+            iso_out["year"].astype(int).astype(str)
+            + "-W"
+            + iso_out["week"].astype(int).astype(str).str.zfill(2)
+        )
+        out_by_week = out_df.groupby("iso_label")["out"].sum()
     else:
-        date_range_label = None
-        months_in_range = 0
+        out_by_week = {}
 
-    avg_monthly_spend = float(total_spent / months_in_range) if months_in_range > 0 else 0.0
-
-
-    if len(spend_df) > 0:
-        spend_df["period"] = spend_df["date"].dt.strftime("%Y-%m")
-        monthly = spend_df.groupby("period")["spend"].sum().sort_index()
-        monthly_spend_history = [{"period": p, "amount": float(a)} for p, a in monthly.items()]
+    if not in_df.empty:
+        iso_in = in_df["date"].dt.isocalendar()
+        in_df["iso_label"] = (
+            iso_in["year"].astype(int).astype(str)
+            + "-W"
+            + iso_in["week"].astype(int).astype(str).str.zfill(2)
+        )
+        in_by_week = in_df.groupby("iso_label")["in"].sum()
     else:
-        monthly_spend_history = []
+        in_by_week = {}
 
-    spend_df["category"] = spend_df["description"].apply(categorise)
-    by_cat = spend_df.groupby("category")["spend"].sum().sort_values(ascending=False)
-    category_spend_totals = {k: float(v) for k, v in by_cat.items()}
-    non_other = by_cat.drop(labels=["Other"], errors="ignore")
+    weekly_out = [float(out_by_week.get(w, 0.0)) for w in week_labels]
+    weekly_in = [float(in_by_week.get(w, 0.0)) for w in week_labels]
+    weekly_avg_out = float(sum(weekly_out) / len(weekly_out)) if week_labels else 0.0
 
+    weekly_by_category_out = {}
+    if not out_df.empty:
+        week_cat = out_df.groupby(["iso_label", "category"])["out"].sum()
+        categories = sorted(out_df["category"].dropna().unique().tolist())
+        for cat in categories:
+            weekly_by_category_out[cat] = [float(week_cat.get((w, cat), 0.0)) for w in week_labels]
 
-    top_category = non_other.idxmax() if len(non_other) else None
-    top_category_spent = float(non_other.max()) if len(non_other) else 0.0
+    bucket_labels = ["£0–5", "£5–10", "£10–25", "£25–50", "£50–100", "£100–250", "£250–500", "£500+"]
+    out_counts = [0] * len(bucket_labels)
+    in_counts = [0] * len(bucket_labels)
 
-    metrics = {
-        "total_transactions": total_transactions,
-        "total_spent": total_spent,
-        "avg_monthly_spend": avg_monthly_spend,
-        "top_category": top_category,
-        "top_category_spent": top_category_spent,
-        "date_range_label": date_range_label,
-        "monthly_spend_history": monthly_spend_history,
-        "category_spend_totals": category_spend_totals
+    def bucket_idx(gbp: float) -> int:
+        if gbp < 5: return 0
+        if gbp < 10: return 1
+        if gbp < 25: return 2
+        if gbp < 50: return 3
+        if gbp < 100: return 4
+        if gbp < 250: return 5
+        if gbp < 500: return 6
+        return 7
+
+    if not out_df.empty:
+        for val in out_df["out"].dropna().tolist():
+            out_counts[bucket_idx(float(val))] += 1
+
+    if not in_df.empty:
+        for val in in_df["in"].dropna().tolist():
+            in_counts[bucket_idx(float(val))] += 1
+
+    buckets = {
+        "outgoingSize": {"labels": bucket_labels, "counts": out_counts},
+        "incomingSize": {"labels": bucket_labels, "counts": in_counts},
     }
 
-    return metrics
+    return {
+        "total_transactions": total_transactions,
+        "date_range_label": date_range_label,
+        "monthly": {
+            "labels": month_labels,
+            "in": monthly_in,
+            "out": monthly_out,
+            "avgOut": monthly_avg_out,
+            "byCategoryOut": monthly_by_category_out
+        },
+        "weekly": {
+            "labels": week_labels,
+            "in": weekly_in,
+            "out": weekly_out,
+            "avgOut": weekly_avg_out,
+            "byCategoryOut": weekly_by_category_out
+        },
+        "buckets": buckets
+    }
 
 def categorise(description: str) -> str:
     if not description:
