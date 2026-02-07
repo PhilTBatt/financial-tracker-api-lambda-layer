@@ -18,13 +18,14 @@
 
     Saves transactions to DynamoDB via save_transactions_to_db()
 
-#### 5. Run Tests:
-    Run pytest test: python -m pytest
-    And: sam local invoke -e events/event.json            
+#### 5. Local Testing:
+    Pytest: python -m pytest
 
-#### 6. Build & Deploy Lambda:
-    Build the lambda: sam build
+    Run Lambda locally: sam build
+                        sam local invoke -e events/event.json
+                        (Requires test file in S3: financial-files-bucket/lambda-event-test-example.qif)
 
+#### 6. Deploy Lambda:
     Deploy to aws: sam deploy --resolve-image-repos
 
 #### 7. Usage:

@@ -26,7 +26,8 @@ def lambda_handler(event, context):
     raw_key = record['s3']['object']['key']
     object_key = unquote_plus(raw_key)
     
-    db_id = object_key.split("_", 1)[0]
+    first = object_key.split("_", 1)[0]
+    db_id = first if "_" in object_key else str(uuid.uuid4())
 
     logger.info(f"File uploaded: {object_key} in bucket: {bucket_name}")
 

@@ -3,7 +3,7 @@
         {
             "s3": {
                 "bucket": { "name": "financial-files-bucket" },
-                "object": { "key": "Statements09012954183252.qif" }
+                "object": { "key": "lambda-event-test-example.qif" }
             }
         }
     ]
