@@ -78,48 +78,68 @@ def process_file(qifFile):
     return pd.DataFrame(data)
 
 def save_transactions_to_db(table, df: pd.DataFrame, metrics: dict, db_id: str):
-    transactions = df.to_dict(orient='records')
+    def pennies_val(x):
+        return int(round(float(x) * 100))
 
-    for tx in transactions:
-        tx['amount'] = int(round(tx['amount'] * 100)) if tx['amount'] is not None else 0
+    def pennies_map(m):
+        return {k: pennies_val(v) for k, v in m.items()}
 
     def pennies_array(arr):
         return [int(round(float(x) * 100)) for x in arr]
 
     def pennies_map_of_arrays(m):
         return {k: pennies_array(v) for k, v in m.items()}
+    
+    transactions = df.to_dict(orient='records')
+
+    for tx in transactions:
+        tx['amount'] = int(round(tx['amount'] * 100)) if tx['amount'] is not None else 0
 
     metrics_ddb = {
-        "total_transactions": int(metrics["total_transactions"]),
-        "date_range_label": metrics.get("date_range_label"),
+        "totalTransactions": int(metrics.get("total_transactions", 0)),
+        "dateRangeLabel": metrics.get("date_range_label"),
+        "avgMonthlySpend": pennies_val(metrics.get("monthly", {}).get("avgOut", 0.0)),
+        "avgWeeklySpend": pennies_val(metrics.get("weekly", {}).get("avgOut", 0.0)),
         "monthly": {
-            "labels": metrics["monthly"]["labels"],
-            "in": pennies_array(metrics["monthly"]["in"]),
-            "out": pennies_array(metrics["monthly"]["out"]),
-            "avgOut": int(round(metrics["monthly"]["avgOut"] * 100)),
-            "byCategoryOut": pennies_map_of_arrays(metrics["monthly"]["byCategoryOut"]),
+            "labels": metrics.get("monthly", {}).get("labels", []),
+            "in": pennies_array(metrics.get("monthly", {}).get("in", [])),
+            "out": pennies_array(metrics.get("monthly", {}).get("out", [])),
+            "avgOut": pennies_val(metrics.get("monthly", {}).get("avgOut", 0.0)),
+            "byCategoryOut": pennies_map_of_arrays(metrics.get("monthly", {}).get("byCategoryOut", {})),
         },
         "weekly": {
-            "labels": metrics["weekly"]["labels"],
-            "in": pennies_array(metrics["weekly"]["in"]),
-            "out": pennies_array(metrics["weekly"]["out"]),
-            "avgOut": int(round(metrics["weekly"]["avgOut"] * 100)),
-            "byCategoryOut": pennies_map_of_arrays(metrics["weekly"]["byCategoryOut"]),
+            "labels": metrics.get("weekly", {}).get("labels", []),
+            "in": pennies_array(metrics.get("weekly", {}).get("in", [])),
+            "out": pennies_array(metrics.get("weekly", {}).get("out", [])),
+            "avgOut": pennies_val(metrics.get("weekly", {}).get("avgOut", 0.0)),
+            "byCategoryOut": pennies_map_of_arrays(metrics.get("weekly", {}).get("byCategoryOut", {})),
         },
-        "buckets": metrics["buckets"]
-    }
 
+        "categories": {
+            "outTotalByCategory": pennies_map(metrics.get("categories", {}).get("out_total_by_category", {})),
+            "outCountByCategory": {
+                k: int(v) for k, v in metrics.get("categories", {}).get("out_count_by_category", {}).items()
+            },
+            "avgOutByCategory": pennies_map(metrics.get("categories", {}).get("avg_out_by_category", {})),
+            "outSizeBucketsByCategory": {
+                "labels": metrics.get("categories", {}).get("out_size_buckets_by_category", {}).get("labels", []),
+                "counts": {
+                    k: [int(x) for x in arr]
+                    for k, arr in metrics.get("categories", {}).get("out_size_buckets_by_category", {}).get("counts", {}).items()
+                }
+            }
+        },
+        "buckets": metrics.get("buckets", {"outgoingSize": {"labels": [], "counts": []}, "incomingSize": {"labels": [], "counts": []}})
+    }
 
     item = {
         'id': db_id,
         'transactions': transactions,
         "metrics": metrics_ddb,
-        'created_at': datetime.now(timezone.utc).isoformat()
+        'createdAt': datetime.now(timezone.utc).isoformat()
     }
 
-    response = table.put_item(Item=item, ConditionExpression="attribute_not_exists(id)")
-
-    return response
+    return table.put_item(Item=item, ConditionExpression="attribute_not_exists(id)")
 
 def calculate_metrics(transactions: pd.DataFrame):
     df = transactions.copy()
@@ -151,23 +171,14 @@ def calculate_metrics(transactions: pd.DataFrame):
     in_df["in"] = in_df["amount"]
 
     df["month"] = df["date"].dt.strftime("%Y-%m")
-
     month_labels = sorted(df["month"].unique().tolist())
 
-    out_by_month = out_df.groupby(out_df["date"].dt.strftime("%Y-%m"))["out"].sum()
-    in_by_month = in_df.groupby(in_df["date"].dt.strftime("%Y-%m"))["in"].sum()
+    out_by_month = out_df.groupby(out_df["date"].dt.strftime("%Y-%m"))["out"].sum() if not out_df.empty else {}
+    in_by_month = in_df.groupby(in_df["date"].dt.strftime("%Y-%m"))["in"].sum() if not out_df.empty else {}
 
     monthly_out = [float(out_by_month.get(m, 0.0)) for m in month_labels]
     monthly_in = [float(in_by_month.get(m, 0.0)) for m in month_labels]
     monthly_avg_out = float(sum(monthly_out) / len(monthly_out)) if month_labels else 0.0
-
-    monthly_by_category_out = {}
-    if not out_df.empty:
-        out_df["month"] = out_df["date"].dt.strftime("%Y-%m")
-        month_cat = out_df.groupby(["month", "category"])["out"].sum()
-        categories = sorted(out_df["category"].dropna().unique().tolist())
-        for cat in categories:
-            monthly_by_category_out[cat] = [float(month_cat.get((m, cat), 0.0)) for m in month_labels]
 
     iso_all = df["date"].dt.isocalendar()
     df["iso_label"] = (
@@ -203,13 +214,6 @@ def calculate_metrics(transactions: pd.DataFrame):
     weekly_in = [float(in_by_week.get(w, 0.0)) for w in week_labels]
     weekly_avg_out = float(sum(weekly_out) / len(weekly_out)) if week_labels else 0.0
 
-    weekly_by_category_out = {}
-    if not out_df.empty:
-        week_cat = out_df.groupby(["iso_label", "category"])["out"].sum()
-        categories = sorted(out_df["category"].dropna().unique().tolist())
-        for cat in categories:
-            weekly_by_category_out[cat] = [float(week_cat.get((w, cat), 0.0)) for w in week_labels]
-
     bucket_labels = ["£0–5", "£5–10", "£10–25", "£25–50", "£50–100", "£100–250", "£250–500", "£500+"]
     out_counts = [0] * len(bucket_labels)
     in_counts = [0] * len(bucket_labels)
@@ -223,10 +227,43 @@ def calculate_metrics(transactions: pd.DataFrame):
         if gbp < 250: return 5
         if gbp < 500: return 6
         return 7
+    
+    monthly_by_category_out = {}
+    weekly_by_category_out = {}
+    out_total_by_category = {}
+    out_count_by_category = {}
+    avg_out_by_category = {}
+    out_size_buckets_by_category = {}
 
     if not out_df.empty:
+        out_df["month"] = out_df["date"].dt.strftime("%Y-%m")
+        month_cat = out_df.groupby(["month", "category"])["out"].sum()
+        cats = sorted(out_df["category"].dropna().unique().tolist())
+        for cat in cats:
+            monthly_by_category_out[cat] = [float(month_cat.get((m, cat), 0.0)) for m in month_labels]
+
+        week_cat = out_df.groupby(["iso_label", "category"])["out"].sum()
+        for cat in cats:
+            weekly_by_category_out[cat] = [float(week_cat.get((w, cat), 0.0)) for w in week_labels]
+
+        cat_total = out_df.groupby("category")["out"].sum()
+        cat_count = out_df.groupby("category")["out"].count()
+        out_total_by_category = {cat: float(val) for cat, val in cat_total.items()}
+        out_count_by_category = {cat: int(val) for cat, val in cat_count.items()}
+        avg_out_by_category = {
+            cat: float(out_total_by_category.get(cat, 0.0) / max(out_count_by_category.get(cat, 0), 1))
+            for cat in out_total_by_category.keys()
+        }
+
+        for cat, grp in out_df.groupby("category"):
+            counts = [0] * len(bucket_labels)
+            for val in grp["out"].dropna().tolist():
+                counts[bucket_idx(float(val))] += 1
+            out_size_buckets_by_category[cat] = counts
+
         for val in out_df["out"].dropna().tolist():
             out_counts[bucket_idx(float(val))] += 1
+
 
     if not in_df.empty:
         for val in in_df["in"].dropna().tolist():
@@ -254,6 +291,15 @@ def calculate_metrics(transactions: pd.DataFrame):
             "avgOut": weekly_avg_out,
             "byCategoryOut": weekly_by_category_out
         },
+        "categories": {
+            "out_total_by_category": out_total_by_category,
+            "out_count_by_category": out_count_by_category,
+            "avg_out_by_category": avg_out_by_category,
+            "out_size_buckets_by_category": {
+                "labels": bucket_labels,
+                "counts": out_size_buckets_by_category
+            }
+        },
         "buckets": buckets
     }
 
@@ -265,25 +311,31 @@ def categorise(description: str) -> str:
     if any(x in d for x in ["CASH WITHDRAWAL", "ATM"]):
         return "Cash"
     
-    if any(x in d for x in ["BILL PAYMENT", "STANDING ORDER", "DIRECT DEBIT", "TRANSFER"]):
+    if any(x in d for x in ["BILL PAYMENT", "STANDING ORDER", "DIRECT DEBIT", "TRANSFER", "FASTER PAYMENT", "FP", "BACS", "CHAPS", "BANK GIRO", "GIRO", "INTERNAL TRANSFER", "SORT CODE", "ACCOUNT", "PAYMENT TO", "FROM", "REF:", "RENT", "LETTING", "ESTATE", "HOUSING", "PROPERTY", "LANDLORD"]):
         return "Transfers"
 
-    if any(x in d for x in ["TESCO", "ALDI", "LIDL", "ASDA", "SAINSBURY", "MORRISONS", "WOODLAND STORE"]):
+    if any(x in d for x in ["TESCO", "ALDI", "LIDL", "ASDA", "SAINSBURY", "Sainsbury", "MORRISONS", "WAITROSE", "MARKS", "M&S", "OCADO", "WOODLAND STORE", "CO-OP", "COOP", "CO OP", "SPAR", "PREMIER", "BUDGENS", "ICELAND", "FARMFOODS", "HERON", "COSTCUTTER", "NISA", "ONE STOP"]):
         return "Groceries"
 
-    if any(x in d for x in ["UBER", "TRAINLINE", "BUS", "ARRIVA", "FIRST", "TFL"]):
+    if any(x in d for x in ["UBER", "TRAINLINE", "ARRIVA", "FIRST", "TFL", "NATIONAL RAIL", "RAIL", "LNER", "AVANTI", "NORTHERN", "TRANSPENNINE", "CROSSCOUNTRY", "GWR", "EMR", "SWR", "TPE", "METROLINK", "TRAM", "BUS", "COACH", "NATIONAL EXPRESS", "MEGABUS", "SHELL", "BP", "ESSO", "TEXACO", "PETROL", "FUEL", "GARAGE", "SERVICE STATION", "PARKING", "CAR PARK", "RINGGO", "NCP", "APCOA"]):
         return "Transport"
 
-    if any(x in d for x in ["AMAZON", "AMZN", "EBAY"]):
+    if any(x in d for x in ["AMAZON", "AMZN", "EBAY", "PAYPAL", "PP*", "PAYPAL *", "ETSY", "ALIEXPRESS", "TEMU", "SHEIN", "SHOPIFY", "STRIPE", "SQ *", "SQUARE", "GUMTREE", "VINTED", "DEPOP"]):
         return "Online Shopping"
+    
+    if any(x in d for x in ["NETFLIX", "SPOTIFY", "DISNEY", "AMAZON PRIME", "PRIME VIDEO", "APPLE.COM/BILL", "APPLE MUSIC", "ICLOUD", "GOOGLE ONE", "MICROSOFT", "ADOBE", "NOW TV", "NOWTV", "SKY", "BT SPORT", "BT*", "AUDIBLE", "KINDLE UNLTD", "KINDLE UNLIMITED", "PATREON"]):
+        return "Subscriptions"
 
-    if any(x in d for x in ["STEAM", "STEAMGAMES", "XBOX", "PLAYSTATION", "PSN", "XSOLLA", "NINTENDO", "GOOGLE PLAY", "GOOGLE YOUTUBE"]):
+    if any(x in d for x in ["STEAM", "STEAMGAMES", "XBOX", "MICROSOFT*XBOX", "MICROSOFT XBOX", "XBOXLIVE", "PLAYSTATION", "SONY", "SIE", "PSN", "NINTENDO", "NINTENDO ESHOP", "E-SHOP", "EPIC GAMES", "EPICGAMES", "RIOT GAMES", "BLIZZARD", "BATTLE.NET", "JAGEX", "RUNESCAPE", "GOOGLE PLAY", "GOOGLE*PLAY", "APPLE.COM/BILL", "XSOLLA", "GAMIVO", "ENEBA", "KINGUIN"]):
         return "Gaming"
 
-    if any(x in d for x in ["WILLIAM HILL", "BET365", "LADBROKES", "CORAL", "SKY BET", "PADDY POWER"]):
+    if any(x in d for x in ["WILLIAM HILL", "WILLIAMHILL", "BET365", "LADBROKES", "CORAL", "SKY BET", "SKYBET", "PADDY POWER", "PADDYPOWER", "BETFAIR", "BETFAIR EXCHANGE", "UNIBET", "888", "888SPORT", "888CASINO", "TOMBOLA", "MECCA", "GALA", "GROSVENOR", "LOTTERY", "NATIONAL LOTTERY", "LOTTO", "CASINO", "BOOKMAKER", "BOOKIES"]):
         return "Gambling"
     
-    if any(x in d for x in ["SNOOKER", "BOWL", "BOWLING", "WINTER GARDENS", "THEATRE", "CINEMA"]):
+    if any(x in d for x in ["SNOOKER", "BOWL", "BOWLING", "THEATRE", "CINEMA", "ODEON", "VUE", "CINEWORLD", "WINTER GARDENS", "TICKETMASTER", "SEE TICKETS", "DICE", "EVENTBRITE", "GIG", "CONCERT", "FESTIVAL", "GYM", "LEISURE", "SWIMMING", "POOL"]):
         return "Entertainment"
+    
+    if any(x in d for x in ["CAFE", "CAFÉ", "COFFEE", "STARBUCKS", "COSTA", "PRET", "NERO", "GREGGS", "WETHERSPOON", "SPOONS", "MARSTON", "GREENE KING", "MCDONALD", "KFC", "BURGER", "SUBWAY", "DOMINO", "PIZZA", "PAPA JOHN", "PIZZA HUT", "TAKEAWAY", "CHIPPY", "GRILL", "KEBAB", "RESTAURANT", "BISTRO", "PUB", "INN", "TAVERN", "BAR", "DELIVEROO", "JUST EAT", "UBER EATS"]):
+        return "Food/Drink"
 
     return "Other"

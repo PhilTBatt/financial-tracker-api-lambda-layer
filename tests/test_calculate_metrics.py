@@ -17,7 +17,7 @@ def test_calculate_metrics():
     assert m["monthly"]["labels"] == ["2025-07", "2025-08"]
     assert m["monthly"]["in"] == [0.0, 1000.0]
     assert m["monthly"]["out"] == [24.80, 10.00]
-    assert m["monthly"]["avgOut"] == 17.40
+    assert m["monthly"]["avgOut"] == (24.80 + 10.00) / 2
 
     assert m["monthly"]["byCategoryOut"] == {
         "Entertainment": [4.80, 0.0],
@@ -41,3 +41,28 @@ def test_calculate_metrics():
 
     assert m["buckets"]["incomingSize"]["labels"] == ["£0–5", "£5–10", "£10–25", "£25–50", "£50–100", "£100–250", "£250–500", "£500+"]
     assert m["buckets"]["incomingSize"]["counts"] == [0, 0, 0, 0, 0, 0, 0, 1]
+
+    assert m["categories"]["out_total_by_category"] == {
+        "Entertainment": 4.80,
+        "Groceries": 20.00,
+        "Online Shopping": 10.00,
+    }
+
+    assert m["categories"]["out_count_by_category"] == {
+        "Entertainment": 1,
+        "Groceries": 1,
+        "Online Shopping": 1,
+    }
+
+    assert m["categories"]["avg_out_by_category"] == {
+        "Entertainment": 4.80,
+        "Groceries": 20.00,
+        "Online Shopping": 10.00,
+    }
+
+    assert m["categories"]["out_size_buckets_by_category"]["labels"] == ["£0–5", "£5–10", "£10–25", "£25–50", "£50–100", "£100–250", "£250–500", "£500+"]
+    assert m["categories"]["out_size_buckets_by_category"]["counts"] == {
+        "Entertainment": [1, 0, 0, 0, 0, 0, 0, 0],
+        "Groceries": [0, 0, 1, 0, 0, 0, 0, 0],
+        "Online Shopping": [0, 0, 1, 0, 0, 0, 0, 0]
+    }
