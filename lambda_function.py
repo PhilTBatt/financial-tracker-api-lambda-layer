@@ -129,7 +129,24 @@ def save_transactions_to_db(table, df: pd.DataFrame, metrics: dict, db_id: str):
                 }
             }
         },
-        "buckets": metrics.get("buckets", {"outgoingSize": {"labels": [], "counts": []}, "incomingSize": {"labels": [], "counts": []}})
+        "buckets": metrics.get("buckets", {"outgoingSize": {"labels": [], "counts": []}, "incomingSize": {"labels": [], "counts": []}}),
+        "daily": {
+            "labels": metrics.get("daily", {}).get("labels", []),
+            "out": pennies_array(metrics.get("daily", {}).get("out", [])),
+            "in": pennies_array(metrics.get("daily", {}).get("in", [])),
+        },
+        "rollingOut7d": {
+            "window": int(metrics.get("rollingOut7d", {}).get("window", 7)),
+            "values": pennies_array(metrics.get("rollingOut7d", {}).get("values", [])),
+        },
+        "topOutgoingTransactions": [
+            {
+                "date": t.get("date"),
+                "amount": pennies_val(t.get("amount", 0.0)),
+                "description": t.get("description"),
+            }
+            for t in (metrics.get("topOutgoingTransactions") or [])
+        ]
     }
 
     item = {
@@ -149,14 +166,29 @@ def calculate_metrics(transactions: pd.DataFrame):
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df = df.dropna(subset=["date"])
 
+    bucket_labels = ["£0–5", "£5–10", "£10–25", "£25–50", "£50–100", "£100–250", "£250–500", "£500+"]
+    out_counts = [0] * len(bucket_labels)
+    in_counts = [0] * len(bucket_labels)
+
     if df.empty:
         return {
             "total_transactions": total_transactions,
             "date_range_label": None,
             "monthly": {"labels": [], "in": [], "out": [], "avgOut": 0.0, "byCategoryOut": {}},
             "weekly": {"labels": [], "in": [], "out": [], "avgOut": 0.0, "byCategoryOut": {}},
-            "buckets": {"outgoingSize": {"labels": ["£0–5","£5–10","£10–25","£25–50","£50–100","£100–250","£250+"],
-                                         "counts": [0,0,0,0,0,0,0]}}
+            "categories": {
+                "out_total_by_category": {},
+                "out_count_by_category": {},
+                "avg_out_by_category": {},
+                "out_size_buckets_by_category": {"labels": bucket_labels, "counts": {}}
+            },
+            "buckets": {
+                "outgoingSize": {"labels": bucket_labels, "counts": out_counts},
+                "incomingSize": {"labels": bucket_labels, "counts": in_counts}
+            },
+            "daily": {"labels": [], "out": [], "in": []},
+            "rollingOut7d": {"window": 7, "values": []},
+            "topOutgoingTransactions": []
         }
 
     start = df["date"].min()
@@ -274,6 +306,32 @@ def calculate_metrics(transactions: pd.DataFrame):
         "incomingSize": {"labels": bucket_labels, "counts": in_counts},
     }
 
+    day_labels = pd.date_range(start.normalize(), end.normalize(), freq="D")
+    day_label_strs = [d.strftime("%Y-%m-%d") for d in day_labels]
+
+    out_by_day = out_df.groupby(out_df["date"].dt.strftime("%Y-%m-%d"))["out"].sum() if not out_df.empty else {}
+    in_by_day = in_df.groupby(in_df["date"].dt.strftime("%Y-%m-%d"))["in"].sum() if not in_df.empty else {}
+
+    daily_out = [float(out_by_day.get(day, 0.0)) for day in day_label_strs]
+    daily_in = [float(in_by_day.get(day, 0.0)) for day in day_label_strs]
+
+    roll = pd.Series(daily_out, dtype="float64").rolling(window=7, min_periods=1).mean().tolist()
+    rolling_out_7d = [float(x) for x in roll]
+
+    top_outgoing = []
+    if not df.empty:
+        out_only = df[df["amount"] < 0].copy()
+        if not out_only.empty:
+            out_only = out_only.sort_values("amount", ascending=True).head(10)
+            top_outgoing = [
+                {
+                    "date": r["date"].strftime("%Y-%m-%d") if hasattr(r["date"], "strftime") else str(r["date"])[:10],
+                    "amount": float(r["amount"]),
+                    "description": None if pd.isna(r.get("description")) else str(r.get("description"))
+                }
+                for _, r in out_only.iterrows()
+            ]
+
     return {
         "total_transactions": total_transactions,
         "date_range_label": date_range_label,
@@ -300,7 +358,17 @@ def calculate_metrics(transactions: pd.DataFrame):
                 "counts": out_size_buckets_by_category
             }
         },
-        "buckets": buckets
+        "buckets": buckets,
+        "daily": {
+            "labels": day_label_strs,
+            "out": daily_out,
+            "in": daily_in
+        },
+        "rollingOut7d": {
+            "window": 7,
+            "values": rolling_out_7d
+        },
+        "topOutgoingTransactions": top_outgoing
     }
 
 def categorise(description: str) -> str:

@@ -47,7 +47,19 @@ def test_save_transactions_to_db(setup_db):
                 "labels": ["£0–5", "£5–10", "£10–25", "£25–50", "£50–100", "£100–250", "£250–500", "£500+"],
                 "counts": [0, 0, 1, 0, 0, 0, 0, 0]
             }
-        }
+        },
+        "daily": {
+            "labels": ["2026-01-01", "2026-01-02", "2026-01-03", "2026-01-04", "2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-10"],
+            "out":    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 600.0],
+            "in":     [12.34, 56.78, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        },
+        "rollingOut7d": {
+            "window": 7,
+            "values": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 85.71428571428571]
+        },
+        "topOutgoingTransactions": [
+            {"date": "2026-01-10", "amount": -600.00, "description": "BIG PURCHASE"}
+        ]
     }
 
     save_transactions_to_db(setup_db, df, metrics, "1")
@@ -82,3 +94,16 @@ def test_save_transactions_to_db(setup_db):
 
     assert item["metrics"]["buckets"]["outgoingSize"]["counts"] == [0, 0, 0, 0, 0, 0, 0, 1]
     assert item["metrics"]["buckets"]["incomingSize"]["counts"] == [0, 0, 1, 0, 0, 0, 0, 0]
+
+    assert item["metrics"]["daily"]["labels"][0] == "2026-01-01"
+    assert item["metrics"]["daily"]["out"][-1] == 60000
+    assert item["metrics"]["daily"]["in"][0] == 1234
+    assert item["metrics"]["daily"]["in"][1] == 5678
+
+    assert item["metrics"]["rollingOut7d"]["window"] == 7
+    assert len(item["metrics"]["rollingOut7d"]["values"]) == len(item["metrics"]["daily"]["labels"])
+    assert item["metrics"]["rollingOut7d"]["values"][-1] == 8571
+
+    assert item["metrics"]["topOutgoingTransactions"][0]["date"] == "2026-01-10"
+    assert item["metrics"]["topOutgoingTransactions"][0]["amount"] == -60000
+    assert item["metrics"]["topOutgoingTransactions"][0]["description"] == "BIG PURCHASE"
