@@ -383,7 +383,7 @@ def categorise(description: str) -> str:
     if any(x in d for x in ["TESCO", "ALDI", "LIDL", "ASDA", "SAINSBURY", "Sainsbury", "MORRISONS", "WAITROSE", "MARKS", "M&S", "OCADO", "WOODLAND STORE", "CO-OP", "COOP", "CO OP", "SPAR", "PREMIER", "BUDGENS", "ICELAND", "FARMFOODS", "HERON", "COSTCUTTER", "NISA", "ONE STOP"]):
         return "Groceries"
 
-    if any(x in d for x in ["UBER", "TRAINLINE", "ARRIVA", "FIRST", "TFL", "NATIONAL RAIL", "RAIL", "LNER", "AVANTI", "NORTHERN", "TRANSPENNINE", "CROSSCOUNTRY", "GWR", "EMR", "SWR", "TPE", "METROLINK", "TRAM", "BUS", "COACH", "NATIONAL EXPRESS", "MEGABUS", "SHELL", "BP", "ESSO", "TEXACO", "PETROL", "FUEL", "GARAGE", "SERVICE STATION", "PARKING", "CAR PARK", "RINGGO", "NCP", "APCOA"]):
+    if any(x in d for x in ["UBER", "TRAINLINE", "ARRIVA", "FIRST BUS", "TFL", "NATIONAL RAIL", "LNER", "AVANTI", "NORTHERN", "TRANSPENNINE", "CROSSCOUNTRY", "GWR", "EMR", "SWR", "TPE", "METROLINK", "TRAM", "STAGECOACH", "COACH", "NATIONAL EXPRESS", "MEGABUS", "SHELL", "ESSO", "TEXACO", "PETROL", "FUEL", "GARAGE", "SERVICE STATION", "PARKING", "CAR PARK", "RINGGO", "NCP", "APCOA"]):
         return "Transport"
 
     if any(x in d for x in ["AMAZON", "AMZN", "EBAY", "PAYPAL", "PP*", "PAYPAL *", "ETSY", "ALIEXPRESS", "TEMU", "SHEIN", "SHOPIFY", "STRIPE", "SQ *", "SQUARE", "GUMTREE", "VINTED", "DEPOP", "PANDORA", "HUEL"]):
@@ -404,7 +404,7 @@ def categorise(description: str) -> str:
     if any(x in d for x in ["CAFE", "CAFÉ", "COFFEE", "STARBUCKS", "COSTA", "PRET", "NERO", "GREGGS", "WETHERSPOON", "SPOONS", "MARSTON", "GREENE KING", "MCDONALD", "KFC", "BURGER", "SUBWAY", "DOMINO", "PIZZA", "PAPA JOHN", "PIZZA HUT", "TAKEAWAY", "CHIPPY", "GRILL", "KEBAB", "RESTAURANT", "BISTRO", "PUB", "INN", "TAVERN", "BAR", "DELIVEROO", "JUST EAT", "UBER EATS"]):
         return "Food/Drink"
     
-    if any(x in d for x in ["BILL PAYMENT", "STANDING ORDER", "DIRECT DEBIT", "TRANSFER", "FASTER PAYMENT", "FP", "BACS", "CHAPS", "BANK GIRO", "GIRO", "INTERNAL TRANSFER", "PAYMENT REF", "REF:", "RENT", "LETTING", "ESTATE", "HOUSING", "PROPERTY", "LANDLORD"]):
+    if any(x in d for x in ["BILL PAYMENT", "STANDING ORDER", "DIRECT DEBIT", "TRANSFER", "FASTER PAYMENT", "BACS", "CHAPS", "BANK GIRO", "GIRO", "INTERNAL TRANSFER", "PAYMENT REF", "REF:", "RENT", "LETTING", "ESTATE", "HOUSING", "PROPERTY", "LANDLORD"]):
         return "Transfers"
 
     return "Other"
