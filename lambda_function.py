@@ -374,13 +374,11 @@ def calculate_metrics(transactions: pd.DataFrame):
 def categorise(description: str) -> str:
     if not description:
         return "Other" 
+    
     d = description.upper()
 
     if any(x in d for x in ["CASH WITHDRAWAL", "ATM"]):
         return "Cash"
-    
-    if any(x in d for x in ["BILL PAYMENT", "STANDING ORDER", "DIRECT DEBIT", "TRANSFER", "FASTER PAYMENT", "FP", "BACS", "CHAPS", "BANK GIRO", "GIRO", "INTERNAL TRANSFER", "SORT CODE", "ACCOUNT", "PAYMENT TO", "FROM", "REF:", "RENT", "LETTING", "ESTATE", "HOUSING", "PROPERTY", "LANDLORD"]):
-        return "Transfers"
 
     if any(x in d for x in ["TESCO", "ALDI", "LIDL", "ASDA", "SAINSBURY", "Sainsbury", "MORRISONS", "WAITROSE", "MARKS", "M&S", "OCADO", "WOODLAND STORE", "CO-OP", "COOP", "CO OP", "SPAR", "PREMIER", "BUDGENS", "ICELAND", "FARMFOODS", "HERON", "COSTCUTTER", "NISA", "ONE STOP"]):
         return "Groceries"
@@ -388,10 +386,10 @@ def categorise(description: str) -> str:
     if any(x in d for x in ["UBER", "TRAINLINE", "ARRIVA", "FIRST", "TFL", "NATIONAL RAIL", "RAIL", "LNER", "AVANTI", "NORTHERN", "TRANSPENNINE", "CROSSCOUNTRY", "GWR", "EMR", "SWR", "TPE", "METROLINK", "TRAM", "BUS", "COACH", "NATIONAL EXPRESS", "MEGABUS", "SHELL", "BP", "ESSO", "TEXACO", "PETROL", "FUEL", "GARAGE", "SERVICE STATION", "PARKING", "CAR PARK", "RINGGO", "NCP", "APCOA"]):
         return "Transport"
 
-    if any(x in d for x in ["AMAZON", "AMZN", "EBAY", "PAYPAL", "PP*", "PAYPAL *", "ETSY", "ALIEXPRESS", "TEMU", "SHEIN", "SHOPIFY", "STRIPE", "SQ *", "SQUARE", "GUMTREE", "VINTED", "DEPOP"]):
+    if any(x in d for x in ["AMAZON", "AMZN", "EBAY", "PAYPAL", "PP*", "PAYPAL *", "ETSY", "ALIEXPRESS", "TEMU", "SHEIN", "SHOPIFY", "STRIPE", "SQ *", "SQUARE", "GUMTREE", "VINTED", "DEPOP", "PANDORA", "HUEL"]):
         return "Online Shopping"
     
-    if any(x in d for x in ["NETFLIX", "SPOTIFY", "DISNEY", "AMAZON PRIME", "PRIME VIDEO", "APPLE.COM/BILL", "APPLE MUSIC", "ICLOUD", "GOOGLE ONE", "MICROSOFT", "ADOBE", "NOW TV", "NOWTV", "SKY", "BT SPORT", "BT*", "AUDIBLE", "KINDLE UNLTD", "KINDLE UNLIMITED", "PATREON"]):
+    if any(x in d for x in ["NETFLIX", "SPOTIFY", "DISNEY", "AMAZON PRIME", "PRIME VIDEO", "APPLE.COM/BILL", "APPLE MUSIC", "ICLOUD", "GOOGLE ONE", "MICROSOFT", "ADOBE", "NOW TV", "NOWTV", "SKY", "BT SPORT", "BT*", "AUDIBLE", "KINDLE UNLTD", "KINDLE UNLIMITED", "PATREON", "DATACAMP"]):
         return "Subscriptions"
 
     if any(x in d for x in ["STEAM", "STEAMGAMES", "XBOX", "MICROSOFT*XBOX", "MICROSOFT XBOX", "XBOXLIVE", "PLAYSTATION", "SONY", "SIE", "PSN", "NINTENDO", "NINTENDO ESHOP", "E-SHOP", "EPIC GAMES", "EPICGAMES", "RIOT GAMES", "BLIZZARD", "BATTLE.NET", "JAGEX", "RUNESCAPE", "GOOGLE PLAY", "GOOGLE*PLAY", "APPLE.COM/BILL", "XSOLLA", "GAMIVO", "ENEBA", "KINGUIN"]):
@@ -405,5 +403,8 @@ def categorise(description: str) -> str:
     
     if any(x in d for x in ["CAFE", "CAFÉ", "COFFEE", "STARBUCKS", "COSTA", "PRET", "NERO", "GREGGS", "WETHERSPOON", "SPOONS", "MARSTON", "GREENE KING", "MCDONALD", "KFC", "BURGER", "SUBWAY", "DOMINO", "PIZZA", "PAPA JOHN", "PIZZA HUT", "TAKEAWAY", "CHIPPY", "GRILL", "KEBAB", "RESTAURANT", "BISTRO", "PUB", "INN", "TAVERN", "BAR", "DELIVEROO", "JUST EAT", "UBER EATS"]):
         return "Food/Drink"
+    
+    if any(x in d for x in ["BILL PAYMENT", "STANDING ORDER", "DIRECT DEBIT", "TRANSFER", "FASTER PAYMENT", "FP", "BACS", "CHAPS", "BANK GIRO", "GIRO", "INTERNAL TRANSFER", "PAYMENT REF", "REF:", "RENT", "LETTING", "ESTATE", "HOUSING", "PROPERTY", "LANDLORD"]):
+        return "Transfers"
 
     return "Other"
